@@ -300,11 +300,12 @@ def get_dc_host(ldap_session, domain_dumper,options):
 
 def get_domain_admins(ldap_session, domain_dumper):
     admins = []
-    ldap_session.search(domain_dumper.root, '(sAMAccountName=%s)' % escape_filter_chars("Domain Admins"), 
+    ldap_session.search(domain_dumper.root, '(objectClass=group)',
             attributes=['objectSid'])
-    a = ldap_session.entries[0]
-    js = a.entry_to_json()
-    dn = json.loads(js)['dn']
+    for entrie in ldap_session.entries:
+        js = json.loads(entrie.entry_to_json())
+        if js["attributes"]["objectSid"][0].endswith('-512'):
+            dn = js['dn']
     search_filter = f"(&(objectClass=person)(sAMAccountName=*)(memberOf:1.2.840.113556.1.4.1941:={dn}))"
 
     ldap_session.search(domain_dumper.root, search_filter, attributes=["sAMAccountName"])
@@ -327,6 +328,10 @@ def del_added_computer(ldap_session, domain_dumper, domainComputer):
         logging.info('Delete computer {} successfully!'.format(domainComputer))
     else:
         logging.critical('Delete computer {} Failed! Maybe the current user does not have permission.'.format(domainComputer))
+        logging.warning('You can manually delete the computer via the following command:')
+        print('powershell -c "remove-adcomputer -identity {} -Confirm:$false"'.format(domainComputer))
+        logging.warning('To verify if manual deletion worked, run the following command and check:')
+        print('powershell -c "get-adcomputer -filter * | findstr SamAccountName | findstr {}"'.format(domainComputer[:-1]))
 
 
 class GETTGT:
